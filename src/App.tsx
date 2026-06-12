@@ -44,7 +44,9 @@ import {
   Minus,
   Briefcase,
   Menu,
-  Settings
+  Settings,
+  Bookmark,
+  BookmarkCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -353,7 +355,7 @@ export default function App() {
       {/* BRAND STYLE TOP NAVIGATION BAR */}
       <header className="sticky top-0 z-40 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-white/5 px-3 py-2 md:px-6 md:py-2.5 shrink-0 flex flex-col md:flex-row items-center justify-between gap-2.5 md:gap-4">
         {/* Brand Logo & Name */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-start w-full md:w-auto gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shadow-lg shrink-0">
             <svg 
               className="w-4 h-4 text-white" 
@@ -378,10 +380,10 @@ export default function App() {
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <h1 className="text-xs md:text-sm font-black uppercase tracking-[0.16em] text-white">
-                CANDLE TRADE
+                ISI
               </h1>
               <span className="text-[7px] md:text-[7.5px] font-mono border border-white/20 text-white px-1.5 py-0.5 rounded font-black uppercase tracking-widest leading-none bg-white/5">
-                ISI
+                V7
               </span>
             </div>
             <span className="text-[7px] md:text-[7.5px] font-mono uppercase tracking-[0.18em] text-white font-semibold block mt-0.5">
@@ -882,7 +884,7 @@ export default function App() {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <LeadersTab activeConfig={activeConfig} onSelectTicker={handleSelectTicker} portfolio={portfolio} getDynamicStock={getDynamicStock} />
+                  <LeadersTab activeConfig={activeConfig} onSelectTicker={handleSelectTicker} portfolio={portfolio} watchlist={watchlist} getDynamicStock={getDynamicStock} />
                 </motion.div>
               )}
 
@@ -1080,6 +1082,22 @@ export default function App() {
                               </button>
                             </>
                           )}
+
+                          <button
+                            onClick={() => handleToggleWatchlist(activeStock.ticker)}
+                            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer font-mono flex items-center gap-2 border ${
+                              watchlist.some(w => w.ticker === activeStock.ticker)
+                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+                                : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                            }`}
+                            title="Tambah/Hapus dari Daftar Pantau"
+                          >
+                            {watchlist.some(w => w.ticker === activeStock.ticker) ? (
+                              <BookmarkCheck className="w-4 h-4" />
+                            ) : (
+                              <Bookmark className="w-4 h-4" />
+                            )}
+                          </button>
                         </div>
                       );
                     })()}
@@ -1262,7 +1280,7 @@ export default function App() {
 
               {/* Collapsed Drawer footer */}
               <div className="p-4 bg-black border-t border-white/5 text-[10px] text-white/30 text-center shrink-0">
-                Click elsewhere to dismiss • Indonesia Stock Intelligence V4
+                Click elsewhere to dismiss • Indonesia Stock Intelligence V7
               </div>
             </motion.div>
           </div>
@@ -1273,7 +1291,7 @@ export default function App() {
       <footer id="credits-footer" className="py-8 bg-[#070707] border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 lg:px-8 text-center space-y-2">
           <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
-            Indonesia Stock Intelligence • Terminal Version V4.1
+            Indonesia Stock Intelligence • Terminal Version V7
           </p>
           <p className="text-[10px] text-white/35 max-w-xl mx-auto leading-relaxed">
             Legal Disclaimer: Any simulated trading portfolios, historical backtests, or factor scoring calculations provided within this workspace do not represent formal investment pathways in Bursa Efek Indonesia. Always review with licensed securities advisors before trading real investment funds.

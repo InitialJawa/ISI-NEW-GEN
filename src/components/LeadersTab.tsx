@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { L, CW_F, CW_B, RK, EX, getProcessedLeaders } from "../marketData";
 import { STOCKS_DATA } from "../stocksData";
-import { StockData, PortfolioItem } from "../types";
+import { StockData, PortfolioItem, WatchlistItem } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, Sliders, Play, TrendingUp, TrendingDown, LayoutGrid, Table, RefreshCw, BookmarkCheck } from "lucide-react";
+import { Search, Sliders, Play, TrendingUp, TrendingDown, LayoutGrid, Table, RefreshCw, BookmarkCheck, Bookmark } from "lucide-react";
 
 // Rotation tracking database helper to identify market shifts & top/bottom entries
 export function getRotationData(ticker: string, dynamicChange?: number) {
@@ -66,10 +66,11 @@ interface LeadersTabProps {
   activeConfig: "prod" | "res";
   onSelectTicker: (ticker: string) => void;
   portfolio?: PortfolioItem[];
+  watchlist?: WatchlistItem[];
   getDynamicStock: (ticker: string) => StockData | null;
 }
 
-export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], getDynamicStock }: LeadersTabProps) {
+export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], watchlist = [], getDynamicStock }: LeadersTabProps) {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [search, setSearch] = useState("");
 
@@ -177,6 +178,7 @@ export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], getDy
                     const liveStk = activeStocksList.find(s => s.ticker === clean);
                     const rot = getRotationData(item.ticker, liveStk?.change);
                     const isInPorto = portfolio.some(p => p.ticker === clean);
+                    const isInWatchlist = watchlist.some(w => w.ticker === clean);
                     return (
                       <tr 
                         key={item.ticker} 
@@ -191,7 +193,7 @@ export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], getDy
                             <div className="flex items-center gap-1 shrink-0">
                               <span className={`inline-flex items-center gap-1 w-10 font-black ${isInPorto ? "text-amber-400" : "text-white"}`}>
                                 {clean}
-                                {isInPorto && <BookmarkCheck className="w-2.5 h-2.5 shrink-0" />}
+                                {isInPorto ? <BookmarkCheck className="w-2.5 h-2.5 shrink-0" /> : isInWatchlist ? <Bookmark className="w-2.5 h-2.5 shrink-0 text-white/50" /> : null}
                               </span>
                               <span className="inline-flex w-10 shrink-0">
                                 {item.rankChange > 0 && (
@@ -281,6 +283,7 @@ export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], getDy
               const liveStk = activeStocksList.find(s => s.ticker === clean);
               const rot = getRotationData(item.ticker, liveStk?.change);
               const isInPorto = portfolio.some(p => p.ticker === clean);
+              const isInWatchlist = watchlist.some(w => w.ticker === clean);
               return (
                 <div
                   key={item.ticker}
@@ -296,7 +299,7 @@ export function LeadersTab({ activeConfig, onSelectTicker, portfolio = [], getDy
                       <span className="text-[9px] text-[#E0E0E0]/40 block leading-none font-semibold">Rank #{processedLeaders.findIndex(p => p.ticker === item.ticker) + 1}</span>
                       <h4 className={`text-sm font-black tracking-wide mt-1 flex flex-wrap items-center gap-1.5 leading-none ${isInPorto ? "text-amber-400" : "text-white"}`}>
                         <span>{clean}</span>
-                        {isInPorto && <BookmarkCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                        {isInPorto ? <BookmarkCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : isInWatchlist ? <Bookmark className="w-3.5 h-3.5 text-white/50 shrink-0" /> : null}
                         {item.rankChange !== 0 && (
                           <span className={`text-[8px] px-1 py-0.5 rounded font-mono ${item.rankChange > 0 ? "text-emerald-400 bg-emerald-500/10" : "text-rose-450 text-rose-400 bg-rose-500/10"}`}>
                             {item.rankChange > 0 ? "+" : ""}{item.rankChange}
