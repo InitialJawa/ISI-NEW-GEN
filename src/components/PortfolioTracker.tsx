@@ -69,6 +69,7 @@ export function PortfolioTracker({
   const [editCashStr, setEditCashStr] = useState("");
   const [isSettingsLocked, setIsSettingsLocked] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
 
   useEffect(() => {
     if (notification) {
@@ -245,7 +246,9 @@ export function PortfolioTracker({
     return { rank, score };
   };
 
-  const enrichedPortfolio = portfolio.map((item) => {
+  const enrichedPortfolio = portfolio
+    .filter(item => item.ticker !== "EMAS" && item.ticker !== "GOLD")
+    .map((item) => {
     const liveStock = visibleStocks.find(s => s.ticker === item.ticker);
     const currentPrice = liveStock ? liveStock.currentPrice : item.buyPrice;
     
@@ -318,6 +321,7 @@ export function PortfolioTracker({
     if (isIHSGInCrisis) {
       // 1. In crisis, recommend liquidating all stocks to Safe Haven asset
       portfolio.forEach(item => {
+        if (item.ticker === "EMAS" || item.ticker === "GOLD") return;
         const stock = visibleStocks.find(s => s.ticker === item.ticker);
         const price = stock ? stock.currentPrice : item.buyPrice;
         list.push({
@@ -352,7 +356,7 @@ export function PortfolioTracker({
 
       // Recommend liquidating non-target stocks
       portfolio.forEach(item => {
-        if (item.ticker !== targetTicker) {
+        if (item.ticker !== targetTicker && item.ticker !== "EMAS" && item.ticker !== "GOLD") {
           const itemStock = visibleStocks.find(s => s.ticker === item.ticker);
           const price = itemStock ? itemStock.currentPrice : item.buyPrice;
           list.push({
@@ -426,6 +430,7 @@ export function PortfolioTracker({
     } else {
       // 3. Normal regime: check exits first
       portfolio.forEach(item => {
+        if (item.ticker === "EMAS" || item.ticker === "GOLD") return;
         const cleanT = item.ticker.toUpperCase().replace(".JK", "");
         const inTargets = topNTargetStocks.some(t => t.ticker.replace(".JK", "").toUpperCase() === cleanT);
         const exData = EX.find(e => e.ticker.replace(".JK", "").toUpperCase() === cleanT);
@@ -1475,14 +1480,18 @@ export function PortfolioTracker({
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm("Ingin menghapus riwayat laporan transaksi?")) {
+                    if (isConfirmingClear) {
                       setTradeLogs([]);
                       saveStateToBackend(cash, engineConfig, []);
+                      setIsConfirmingClear(false);
+                    } else {
+                      setIsConfirmingClear(true);
+                      setTimeout(() => setIsConfirmingClear(false), 3000); // reset after 3s
                     }
                   }}
-                  className="text-[8px] uppercase tracking-wider font-bold text-rose-500 hover:text-rose-455 transition-colors cursor-pointer"
+                  className={`text-[8px] uppercase tracking-wider font-bold transition-colors cursor-pointer ${isConfirmingClear ? "text-white bg-rose-500 px-2 py-0.5 rounded" : "text-rose-500 hover:text-rose-455"}`}
                 >
-                  Clear History
+                  {isConfirmingClear ? "⚠️ Klik Lagi Untuk Hapus" : "Clear History"}
                 </button>
               </div>
             </div>
