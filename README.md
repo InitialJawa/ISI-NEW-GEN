@@ -9,7 +9,7 @@
 [![Gemini](https://img.shields.io/badge/Gemini_AI-2.5_Flash-F4B400?style=for-the-badge&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 
 <p align="center">
-  <b>Terminal finansial kuantitatif cerdas perhitungan backtest untuk simulasi portofolio, analisis faktor investasi, dan mitigasi krisis di Bursa Efek Indonesia (BEI / IDX).</b>
+  <b>Terminal finansial kuantitatif cerdas berbasis AI untuk simulasi portofolio, analisis faktor investasi, dan mitigasi krisis di Bursa Efek Indonesia (BEI / IDX).</b>
 </p>
 
 ---
