@@ -12,7 +12,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     return parts.map((part, idx) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         return (
-          <strong key={idx} className="font-bold text-white dark:text-white">
+          <strong key={idx} className="font-bold text-white">
             {part.slice(2, -2)}
           </strong>
         );
@@ -21,7 +21,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         return (
           <code
             key={idx}
-            className="bg-white/10 dark:bg-black/20 px-1 py-0.5 rounded font-mono text-emerald-400 dark:text-emerald-600 text-[10px]"
+            className="bg-white/10 px-1 py-0.5 rounded font-mono text-emerald-400 text-[10px]"
           >
             {part.slice(1, -1)}
           </code>
@@ -54,31 +54,31 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     blocks.push(
       <div
         key={`table-${key}`}
-        className="my-3 overflow-x-auto w-full border border-white/10 dark:border-black/10 rounded-xl bg-black/30 dark:bg-slate-50/50 shadow-sm scrollbar-thin"
+        className="my-3 overflow-x-auto w-full border border-white/10 rounded-xl bg-black/30 shadow-sm scrollbar-thin"
       >
-        <table className="min-w-full divide-y divide-white/10 dark:divide-black/10 text-[11px] sm:text-xs font-mono">
-          <thead className="bg-white/[0.03] dark:bg-slate-100/50">
+        <table className="min-w-full divide-y divide-white/10 text-[11px] sm:text-xs font-mono">
+          <thead className="bg-white/[0.03]">
             <tr>
               {headerRow.map((cell, idx) => (
                 <th
                   key={idx}
-                  className="px-3 py-2 text-left font-bold text-white dark:text-slate-900 border-b border-white/10 dark:border-slate-200 uppercase tracking-wider"
+                  className="px-3 py-2 text-left font-bold text-white border-b border-white/10 uppercase tracking-wider"
                 >
                   {parseInline(cell)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5 dark:divide-slate-200/50">
+          <tbody className="divide-y divide-white/5">
             {dataRows.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
-                className="hover:bg-white/[0.02] dark:hover:bg-slate-100/20 transition-colors"
+                className="hover:bg-white/[0.02] transition-colors"
               >
                 {row.map((cell, cellIdx) => (
                   <td
                     key={cellIdx}
-                    className="px-3 py-2 text-white/90 dark:text-slate-800 whitespace-nowrap"
+                    className="px-3 py-2 text-white/90 whitespace-nowrap"
                   >
                     {parseInline(cell)}
                   </td>
@@ -98,7 +98,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     blocks.push(
       <ul
         key={`list-${key}`}
-        className="list-disc pl-5 my-3 space-y-1.5 text-white/80 dark:text-slate-700 text-xs sm:text-sm"
+        className="list-disc pl-5 my-3 space-y-1.5 text-white/80 text-xs sm:text-sm"
       >
         {currentList.map((item, idx) => (
           <li key={idx} className="leading-relaxed">
@@ -143,7 +143,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       blocks.push(
         <h3
           key={i}
-          className="text-xs sm:text-sm font-extrabold text-white dark:text-slate-900 mt-4 mb-2 flex items-center gap-1.5 uppercase tracking-wide border-b border-white/5 dark:border-slate-100 pb-1"
+          className="text-xs sm:text-sm font-extrabold text-white mt-4 mb-2 flex items-center gap-1.5 uppercase tracking-wide border-b border-white/5 pb-1"
         >
           {parseInline(trimmed.slice(4))}
         </h3>
@@ -155,7 +155,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       blocks.push(
         <h4
           key={i}
-          className="text-[11px] sm:text-xs font-bold text-white/95 dark:text-slate-800 mt-3 mb-1.5 uppercase tracking-wider"
+          className="text-[11px] sm:text-xs font-bold text-white/95 mt-3 mb-1.5 uppercase tracking-wider"
         >
           {parseInline(trimmed.slice(5))}
         </h4>
@@ -167,7 +167,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       blocks.push(
         <h2
           key={i}
-          className="text-sm sm:text-base font-black text-white dark:text-slate-950 mt-5 mb-3 uppercase tracking-wide border-b border-white/10 dark:border-slate-200 pb-1.5"
+          className="text-sm sm:text-base font-black text-white mt-5 mb-3 uppercase tracking-wide border-b border-white/10 pb-1.5"
         >
           {parseInline(trimmed.slice(3))}
         </h2>
@@ -183,7 +183,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     blocks.push(
       <p
         key={i}
-        className="text-white/80 dark:text-slate-700 leading-relaxed mb-3 text-xs sm:text-sm"
+        className="text-white/80 leading-relaxed mb-3 text-xs sm:text-sm"
       >
         {parseInline(line)}
       </p>
