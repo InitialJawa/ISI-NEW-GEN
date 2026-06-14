@@ -7,7 +7,7 @@ import path from "path";
 import cron from "node-cron";
 
 // Firebase Connection
-const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+const firebaseConfigPath = path.join(process.cwd(), "firebase-config.json");
 let db: any = null;
 
 if (fs.existsSync(firebaseConfigPath)) {
@@ -83,54 +83,62 @@ export async function runIdx80Scan() {
   console.log(`Starting Quantitative Scan & Sync to Firebase for ${ACTIVE_UNIVERSE.length} stocks...`);
   const results: any[] = [];
 
-  for (let i = 0; i < ACTIVE_UNIVERSE.length; i++) {
-    const ticker = ACTIVE_UNIVERSE[i];
-    try {
-      const quote: any = await yahooFinance.quoteSummary(ticker, {
-        modules: ["price", "defaultKeyStatistics", "summaryDetail", "financialData", "summaryProfile"]
-      });
-      
-      const price = quote.price?.regularMarketPrice || 0;
-      const change = quote.price?.regularMarketChangePercent || 0;
-      
-      const quality = calcQuality(quote.defaultKeyStatistics, quote.financialData);
-      const value = calcValue(quote.defaultKeyStatistics, quote.summaryDetail);
-      const growth = calcGrowth(quote.financialData);
-      
-      // Momentum proxy using 50d vs 200d average
-      let momentum = 50;
-      if (quote.summaryDetail?.fiftyDayAverage && quote.summaryDetail?.twoHundredDayAverage) {
-         if (quote.summaryDetail.fiftyDayAverage > quote.summaryDetail.twoHundredDayAverage) momentum += 30;
-         if (price > quote.summaryDetail.fiftyDayAverage) momentum += 20;
-         if (price < quote.summaryDetail.twoHundredDayAverage) momentum -= 20;
+  const concurrencyLimit = 15;
+  const pool = [...ACTIVE_UNIVERSE];
+  
+  const worker = async () => {
+    while (pool.length > 0) {
+      const ticker = pool.shift();
+      if (!ticker) break;
+      try {
+        const quote: any = await yahooFinance.quoteSummary(ticker, {
+          modules: ["price", "defaultKeyStatistics", "summaryDetail", "financialData", "summaryProfile"]
+        });
+        
+        const price = quote.price?.regularMarketPrice || 0;
+        const change = quote.price?.regularMarketChangePercent || 0;
+        
+        const quality = calcQuality(quote.defaultKeyStatistics, quote.financialData);
+        const value = calcValue(quote.defaultKeyStatistics, quote.summaryDetail);
+        const growth = calcGrowth(quote.financialData);
+        
+        // Momentum proxy using 50d vs 200d average
+        let momentum = 50;
+        if (quote.summaryDetail?.fiftyDayAverage && quote.summaryDetail?.twoHundredDayAverage) {
+           if (quote.summaryDetail.fiftyDayAverage > quote.summaryDetail.twoHundredDayAverage) momentum += 30;
+           if (price > quote.summaryDetail.fiftyDayAverage) momentum += 20;
+           if (price < quote.summaryDetail.twoHundredDayAverage) momentum -= 20;
+        }
+        momentum = Math.min(100, Math.max(1, momentum));
+        
+        const data = {
+          ticker,
+          companyName: quote.price?.shortName || quote.price?.longName || ticker,
+          sector: quote.summaryProfile?.sector || "Unknown",
+          industry: quote.summaryProfile?.industry || "Unknown",
+          currentPrice: price,
+          changePercent: change * 100, // converting fraction to percent visually if needed
+          quality,
+          value,
+          growth,
+          momentum,
+          volume: quote.summaryDetail?.volume || 0,
+          peRatio: quote.summaryDetail?.trailingPE || quote.summaryDetail?.forwardPE || 0,
+          pbRatio: quote.defaultKeyStatistics?.priceToBook || 0,
+          dividendYield: (quote.summaryDetail?.dividendYield || 0) * 100,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        results.push(data);
+        console.log(`Scanned ${ticker} - DONE`);
+      } catch (err: any) {
+        console.error(`Error scanning ${ticker}:`, err.message);
       }
-      momentum = Math.min(100, Math.max(1, momentum));
-      
-      const data = {
-        ticker,
-        companyName: quote.price?.shortName || quote.price?.longName || ticker,
-        sector: quote.summaryProfile?.sector || "Unknown",
-        industry: quote.summaryProfile?.industry || "Unknown",
-        currentPrice: price,
-        changePercent: change * 100, // converting fraction to percent visually if needed, wait yahoo returns percent as e.g. 1.25 for 1.25%
-        quality,
-        value,
-        growth,
-        momentum,
-        volume: quote.summaryDetail?.volume || 0,
-        peRatio: quote.summaryDetail?.trailingPE || quote.summaryDetail?.forwardPE || 0,
-        pbRatio: quote.defaultKeyStatistics?.priceToBook || 0,
-        dividendYield: (quote.summaryDetail?.dividendYield || 0) * 100,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      results.push(data);
-      console.log(`Scanned ${ticker} - DONE`);
-
-    } catch (err: any) {
-      console.error(`Error scanning ${ticker}:`, err.message);
     }
-  }
+  };
+
+  const workers = Array.from({ length: concurrencyLimit }, () => worker());
+  await Promise.all(workers);
 
   // Save to Firebase
   if (db) {
@@ -150,7 +158,10 @@ export async function runIdx80Scan() {
   }
 
   // Also save locally as a reliable cache
-  const dataPath = path.join(process.cwd(), "data", "idx80_scan.json");
+  const isCloudFunction = !!(process.env.FUNCTIONS_EMULATOR || process.env.FIREBASE_CONFIG);
+  const dataPath = isCloudFunction
+    ? path.join("/tmp", "idx80_scan.json")
+    : path.join(process.cwd(), "data", "idx80_scan.json");
   if (!fs.existsSync(path.dirname(dataPath))) fs.mkdirSync(path.dirname(dataPath), { recursive: true });
   fs.writeFileSync(dataPath, JSON.stringify({ lastUpdated: new Date().toISOString(), stocks: results }, null, 2));
 }

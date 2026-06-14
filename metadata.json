@@ -1,6 +1,0 @@
-{
-  "name": "Quantbit",
-  "description": "Financial analytics dashboard for audit reports, ratios, and stock market price historical trends on Indonesia's Stock Exchange (IDX), enabled by server-side Gemini AI financial reasoning.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

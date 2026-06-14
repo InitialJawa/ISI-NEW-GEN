@@ -1,14 +1,20 @@
 {
-  "name": "react-example",
+  "name": "quantbit-terminal",
+  "version": "1.0.0",
+  "description": "Quantitative stock trading, backtesting, and portfolio management terminal for the Indonesia Stock Exchange (IDX).",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && npm run build:vercel",
+    "build:functions": "esbuild functions-entry.ts --bundle --platform=node --format=esm --target=node20 --external:firebase-admin --external:firebase-functions --external:vite --outfile=functions/index.js",
+    "build:vercel": "esbuild api-handler.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=api/index.js",
+    "vercel-build": "npm run build",
+    "copy:data": "node -e \"const fs = require('fs'); fs.cpSync('data', 'functions/data', { recursive: true });\"",
     "start": "node dist/server.cjs",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "clean": "node -e \"const fs = require('fs'); fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('functions/index.js', { force: true }); fs.rmSync('functions/data', { recursive: true, force: true }); fs.rmSync('api/index.js', { force: true });\"",
+    "lint": "tsc --noEmit",
+    "deploy": "npm run build && npm run copy:data && npm run build:functions && firebase deploy"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

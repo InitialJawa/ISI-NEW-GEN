@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import dotenv from "dotenv";
 import { exec } from "child_process";
@@ -10,7 +9,7 @@ import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 app.use(express.json());
 
 const PORT = 3000;
@@ -22,13 +21,13 @@ function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is missing. Please configure it in the AI Studio Secrets panel.");
+      throw new Error("GEMINI_API_KEY environment variable is missing. Please configure it in your local .env file.");
     }
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
         headers: {
-          "User-Agent": "aistudio-build",
+          "User-Agent": "quantbit-terminal",
         },
       },
     });
@@ -42,10 +41,13 @@ app.get("/api/health", (req, res) => {
 });
 
 // Quantitative Engine Persistent State Setup
-const statePath = path.join(process.cwd(), "data", "engine_state.json");
+const isCloudFunction = !!(process.env.FUNCTIONS_EMULATOR || process.env.FIREBASE_CONFIG || process.env.VERCEL);
+const statePath = isCloudFunction
+  ? path.join("/tmp", "engine_state.json")
+  : path.join(process.cwd(), "data", "engine_state.json");
 
 // Firebase SDK Database connection
-const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+const firebaseConfigPath = path.join(process.cwd(), "firebase-config.json");
 let db: any = null;
 
 if (fs.existsSync(firebaseConfigPath)) {
@@ -646,6 +648,12 @@ app.get("/api/backtest-data", (req, res) => {
 
 // Force update database from Yahoo Finance directly up to today
 app.post("/api/market/sync", (req, res) => {
+  if (isCloudFunction) {
+    return res.status(400).json({
+      success: false,
+      error: "Sinkronisasi database historis langsung tidak didukung di lingkungan cloud (read-only filesystem). Jalankan sinkronisasi secara lokal lalu deploy ulang."
+    });
+  }
   console.log("Starting full Yahoo Finance market database synchronization...");
   exec("npx tsx fetch_historical_data.ts", (error, stdout, stderr) => {
     if (error) {
@@ -664,7 +672,7 @@ app.post("/api/market/sync", (req, res) => {
 // GoAPI Live Stock Prices Proxy
 app.get("/api/goapi/live-prices", async (req, res) => {
   try {
-    const apiKey = process.env.GOAPI_API_KEY || "6a2b12966a7f66.28884917";
+    const apiKey = process.env.GOAPI_API_KEY;
     if (!apiKey) {
       return res.status(400).json({ success: false, error: "GOAPI_API_KEY is missing" });
     }
@@ -799,11 +807,19 @@ app.use("/data", express.static(path.join(process.cwd(), "data")));
 
 // Start Background Scanner Engine
 import { startScannerCron, runIdx80Scan } from "./sync_engine.ts";
-app.post("/api/engine/force-sync", async (req, res) => {
+app.all("/api/engine/force-sync", async (req, res) => {
   try {
-    // Non blocking kick off
-    runIdx80Scan();
-    res.json({ success: true, message: "Manual sync started in background." });
+    // Await execution in cloud environment so that serverless functions do not freeze before finishing
+    if (isCloudFunction) {
+      console.log("Starting serverless forced scan...");
+      await runIdx80Scan();
+      console.log("Serverless forced scan completed.");
+      res.json({ success: true, message: "Sync finished successfully on cloud." });
+    } else {
+      // Non blocking kick off for local development
+      runIdx80Scan();
+      res.json({ success: true, message: "Manual sync started in background." });
+    }
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -818,7 +834,9 @@ app.get("/api/engine/idx80", async (req, res) => {
       }
     }
     // Fallback to local
-    const dataPath = path.join(process.cwd(), "data", "idx80_scan.json");
+    const dataPath = isCloudFunction
+      ? path.join("/tmp", "idx80_scan.json")
+      : path.join(process.cwd(), "data", "idx80_scan.json");
     if (fs.existsSync(dataPath)) {
       return res.json(JSON.parse(fs.readFileSync(dataPath, "utf-8")));
     }
@@ -828,13 +846,16 @@ app.get("/api/engine/idx80", async (req, res) => {
   }
 });
 
-// Start the cron job for the engine updates
-startScannerCron();
+// Start the cron job for the engine updates if not running as a Cloud Function
+if (!isCloudFunction) {
+  startScannerCron();
+}
 
 // Vite & Static file hosting setup
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in development mode. Mounting Vite middleware...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -854,4 +875,7 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start the server listener if not running in Firebase Cloud Functions
+if (!isCloudFunction) {
+  startServer();
+}
