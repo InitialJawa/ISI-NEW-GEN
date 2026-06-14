@@ -81,7 +81,7 @@ export async function refreshActiveUniverse() {
 export async function runIdx80Scan() {
   await refreshActiveUniverse();
   console.log(`Starting Quantitative Scan & Sync to Firebase for ${ACTIVE_UNIVERSE.length} stocks...`);
-  const results = [];
+  const results: any[] = [];
 
   for (let i = 0; i < ACTIVE_UNIVERSE.length; i++) {
     const ticker = ACTIVE_UNIVERSE[i];

@@ -3,6 +3,7 @@ import { StockData, PortfolioItem, WatchlistItem } from "../types";
 import { STOCKS_DATA } from "../stocksData";
 import { SearchableSelect } from "./SearchableSelect";
 import { TickerLogo } from "./TickerLogo";
+import { IDX80_TICKERS, IDX30_TICKERS } from "../../idx80";
 import { EX, getProcessedLeaders, MKT } from "../marketData";
 import {
   PieChart,
@@ -118,6 +119,7 @@ export function PortfolioTracker({
       singleTicker: "BBCA",
       singleSellTrigger: 8,
       singleBuyTrigger: 5,
+      universe: "idx80",
       ...parsed,
     };
   });
@@ -251,10 +253,18 @@ export function PortfolioTracker({
   let totalCurrentValue = 0;
 
   // Sync market rank with Leaders tab actively based on exact active config weights
+  const cleanIdx80 = IDX80_TICKERS.map((t) => t.replace(".JK", ""));
+  const cleanIdx30 = IDX30_TICKERS.map((t) => t.replace(".JK", ""));
+
   const processedLeaders = getProcessedLeaders(
     visibleStocks,
     engineConfig.activeConfig,
-  );
+  ).filter((item) => {
+    const rawTicker = item.ticker.replace(".JK", "");
+    if (engineConfig.universe === "idx80") return cleanIdx80.includes(rawTicker);
+    if (engineConfig.universe === "idx30") return cleanIdx30.includes(rawTicker);
+    return true;
+  });
 
   const getStockRankAndScore = (ticker: string) => {
     const leaderIdx = processedLeaders.findIndex(
@@ -739,9 +749,9 @@ export function PortfolioTracker({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6">
         {/* LEFT COLUMN: ACTIVE HOLDINGS & EXECUTION */}
-        <div className="xl:col-span-8 space-y-6">
+        <div className="md:col-span-1 xl:col-span-8 space-y-6">
           <div className="bg-[#050505] rounded-2xl border border-white/[0.03] p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/[0.05]">
               <h3 className="text-xs font-bold text-white uppercase tracking-widest font-sans flex items-center gap-2">
@@ -1136,7 +1146,7 @@ export function PortfolioTracker({
               </div>
             </div>
 
-            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin space-y-3">
               {tradeLogs.length === 0 ? (
                 <div className="p-6 text-center text-[10px] text-white/30 font-mono italic">
                   Belum ada log transaksi teraudit yang dilakukan pada sesi ini.
@@ -1283,7 +1293,7 @@ export function PortfolioTracker({
         </div>
 
         {/* RIGHT COLUMN: INTEGRATED PERSISTENT QUANT ENGINE COGNITIVE CONSOLE */}
-        <div className="xl:col-span-4 space-y-6">
+        <div className="md:col-span-1 xl:col-span-4 space-y-6 flex flex-col">
           <div className="bg-[#050505] rounded-2xl border border-white/[0.03] p-5 space-y-5">
             <div className="flex justify-between items-center pb-3 border-b border-white/[0.05]">
               <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
@@ -1461,6 +1471,53 @@ export function PortfolioTracker({
                       <span className="text-[8px] font-medium text-white/40 mt-1">
                         Alpha Recovery
                       </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Universe Selection */}
+                <div
+                  className={`space-y-2 ${isSettingsLocked ? "opacity-40 grayscale" : ""}`}
+                >
+                  <span className="text-[10px] uppercase font-bold text-white/40 block tracking-widest">
+                    Universe Emiten Saham
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isSettingsLocked}
+                      onClick={() => updateConfigValue("universe", "all")}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase transition-all tracking-widest cursor-pointer border ${
+                        engineConfig.universe === "all"
+                          ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                          : "bg-white/[0.02] border-white/[0.03] text-white/40 hover:text-white"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      All Mkt
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSettingsLocked}
+                      onClick={() => updateConfigValue("universe", "idx80")}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase transition-all tracking-widest cursor-pointer border ${
+                        engineConfig.universe === "idx80"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                          : "bg-white/[0.02] border-white/[0.03] text-white/40 hover:text-white"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      IDX80
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSettingsLocked}
+                      onClick={() => updateConfigValue("universe", "idx30")}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase transition-all tracking-widest cursor-pointer border ${
+                        engineConfig.universe === "idx30"
+                          ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                          : "bg-white/[0.02] border-white/[0.03] text-white/40 hover:text-white"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      IDX30
                     </button>
                   </div>
                 </div>

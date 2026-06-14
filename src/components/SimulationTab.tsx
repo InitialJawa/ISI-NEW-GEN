@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { PortfolioItem, StockData } from "../types";
 import { STOCKS_DATA } from "../stocksData";
+import { IDX80_TICKERS, IDX30_TICKERS } from "../../idx80";
 import { SearchableSelect } from "./SearchableSelect";
 import { EX, RS, MKT } from "../marketData";
 import historicalDataJson from "../data/historical_market_data.json";
@@ -39,38 +40,6 @@ interface SimulationTabProps {
   defaultSubTab?: "past" | "algo" | "ledger";
   hideTabs?: boolean;
 }
-
-interface HistoricalPriceMap {
-  [ticker: string]: {
-    "5y"?: number;
-    "3y"?: number;
-    "2y"?: number;
-    "1y"?: number;
-    "6m"?: number;
-    "1m"?: number;
-    "1w"?: number;
-  };
-}
-
-// Solid historical start prices lookup database for main Indon equities
-const HISTORICAL_PRICE_DB: HistoricalPriceMap = {
-  BBCA: { "5y": 6100, "3y": 8800, "2y": 9400, "1y": 9900, "6m": 9200, "1m": 9850, "1w": 10050 },
-  BBRI: { "5y": 3800, "3y": 5400, "2y": 4500, "1y": 4400, "6m": 5600, "1m": 4750, "1w": 4820 },
-  TLKM: { "5y": 3400, "3y": 4100, "2y": 3800, "1y": 2900, "6m": 3600, "1m": 3100, "1w": 3130 },
-  ASII: { "5y": 5200, "3y": 6800, "2y": 4600, "1y": 4500, "6m": 5500, "1m": 4950, "1w": 5020 },
-  GOTO: { "5y": 180,  "3y": 115,  "2y": 58,   "1y": 50,   "6m": 98,   "1m": 65,   "1w": 63 },
-  ADRO: { "5y": 1200, "3y": 2200, "2y": 2700, "1y": 2500, "6m": 2400, "1m": 3600, "1w": 3480 },
-};
-
-const TIMELINES = [
-  { id: "5y", label: "5 Tahun Lalu", years: 5, desc: "Holding Jangka Panjang (5 Tahun)" },
-  { id: "3y", label: "3 Tahun Lalu", years: 3, desc: "Siklus Pasar Menengah (3 Tahun)" },
-  { id: "2y", label: "2 Tahun Lalu", years: 2, desc: "Rotasi Sektoral (2 Tahun)" },
-  { id: "1y", label: "1 Tahun Lalu", years: 1, desc: "Pemulihan Makro (1 Tahun)" },
-  { id: "6m", label: "6 Bulan Lalu", years: 0.5, desc: "Tengah Tahun (6 Bulan)" },
-  { id: "1m", label: "1 Bulan Lalu", years: 0.083, desc: "Ayunan Bulanan (1 Bulan)" },
-  { id: "1w", label: "1 Minggu Lalu", years: 0.019, desc: "Sentimen Mingguan (1 Minggu)" },
-];
 
 const formatRupiah = (val: number) => {
   return "Rp " + Math.round(val).toLocaleString("id-ID");
@@ -252,7 +221,8 @@ export function SimulationTab({
   const visibleStocks = STOCKS_DATA.map(s => getDynamicStock(s.ticker) || s);
   // 1. Backtest state matching Stockbit UI
   const [simTicker, setSimTicker] = useState("BBCA");
-  const [simTimeline, setSimTimeline] = useState("5y");
+  const [simStartDate, setSimStartDate] = useState("2016-01-04");
+  const [simEndDate, setSimEndDate] = useState("2026-06-12");
   const [simCapitalInput, setSimCapitalInput] = useState("10000000");
 
   // Today ledger addition state
@@ -272,6 +242,7 @@ export function SimulationTab({
   // Algorithmic Backtester state
   const [algoCapital, setAlgoCapital] = useState("100000000"); // 100 Juta IDR default
   const [simulationMode, setSimulationMode] = useState<"algo" | "single">("algo");
+  const [simUniverse, setSimUniverse] = useState<"all" | "idx80" | "idx30">("idx80");
   const [numStocks, setNumStocks] = useState<1 | 3 | 5>(5);
   const [enableCrossover, setEnableCrossover] = useState(true); // Rank < 7 Rule
   const [enableCrashProtection, setEnableCrashProtection] = useState(true); // IHSG Crash protection
@@ -324,24 +295,31 @@ export function SimulationTab({
 
   const activeStock = useMemo(() => getDynamicStock(simTicker) || getDynamicStock("BBCA"), [simTicker, getDynamicStock]);
 
-  const timelineObj = useMemo(() => TIMELINES.find(t => t.id === simTimeline) || TIMELINES[0], [simTimeline]);
-
-  // Handle calculation of historical buy price
-  const startPrice = useMemo(() => {
+  const simPrices = useMemo(() => {
     const cleanTicker = simTicker.toUpperCase().replace(".JK", "");
-    const stockRecord = HISTORICAL_PRICE_DB[cleanTicker];
-    if (stockRecord && stockRecord[simTimeline as keyof typeof stockRecord]) {
-      return stockRecord[simTimeline as keyof typeof stockRecord]!;
-    }
-    // Synthesize helper mapping for non DB ticker profiles
-    const multipliers: Record<string, number> = {
-      "5y": 0.55, "3y": 0.78, "2y": 0.85, "1y": 0.92, "6m": 0.88, "1m": 0.98, "1w": 0.995
+    
+    // Fallback search using closest matches
+    let startIndex = historicalDataJson.findIndex(d => d.date >= simStartDate);
+    if (startIndex === -1) startIndex = 0;
+    
+    let endIndex = historicalDataJson.findIndex(d => d.date >= simEndDate);
+    if (endIndex === -1) endIndex = historicalDataJson.length - 1;
+    if (historicalDataJson[endIndex].date > simEndDate && endIndex > 0) endIndex--;
+
+    const startRaw = historicalDataJson[startIndex] as any;
+    const endRaw = historicalDataJson[endIndex] as any;
+    
+    const sPrice = startRaw?.stockAdjPrices?.[cleanTicker] || startRaw?.stockPrices?.[cleanTicker] || 100;
+    const ePrice = endRaw?.stockAdjPrices?.[cleanTicker] || endRaw?.stockPrices?.[cleanTicker] || activeStock.currentPrice;
+    
+    return {
+      startPrice: Math.max(50, Math.round(sPrice)),
+      endPrice: Math.round(ePrice),
+      years: Math.max(0.1, (Date.parse(endRaw.date) - Date.parse(startRaw.date)) / (1000*60*60*24*365.25))
     };
-    const mult = multipliers[simTimeline] || 0.85;
-    const charSum = cleanTicker.split("").reduce((sum, c) => sum + c.charCodeAt(0), 0);
-    const dev = 1 + (((charSum % 10) - 5) / 100);
-    return Math.max(50, Math.round(activeStock.currentPrice * mult * dev));
-  }, [simTicker, simTimeline, activeStock.currentPrice]);
+  }, [simTicker, simStartDate, simEndDate, activeStock.currentPrice]);
+  
+  const startPrice = simPrices.startPrice;
 
   // Backtest details calculations
   const simReturnDetails = useMemo(() => {
@@ -355,10 +333,10 @@ export function SimulationTab({
     const annualDividendRate = activeStock.dividendYield || 2.4;
     const divTaxFactor = 0.90; // 10% dividend tax in Indonesia
     const totalDividends = Math.round(
-      realSharesPurchased * (annualDividendRate / 100) * timelineObj.years * startPrice * divTaxFactor
+      realSharesPurchased * (annualDividendRate / 100) * simPrices.years * startPrice * divTaxFactor
     );
 
-    const assetValueNow = realSharesPurchased * activeStock.currentPrice;
+    const assetValueNow = realSharesPurchased * simPrices.endPrice;
     const finalValue = assetValueNow + cashResidual + totalDividends;
     const absoluteProfitLoss = finalValue - simCapital;
     const percentageReturn = simCapital > 0 ? (absoluteProfitLoss / simCapital) * 100 : 0;
@@ -375,14 +353,14 @@ export function SimulationTab({
       absoluteProfitLoss,
       percentageReturn,
     };
-  }, [simCapital, startPrice, activeStock.currentPrice, activeStock.dividendYield, timelineObj.years]);
+  }, [simCapital, startPrice, simPrices.endPrice, activeStock.dividendYield, simPrices.years]);
 
   // Interpolate charting points trace for simulation
   const simulatorChartData = useMemo(() => {
     const steps = 6;
     const data = [];
     const ticker = simTicker;
-    const finalPrice = activeStock.currentPrice;
+    const finalPrice = simPrices.endPrice;
 
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
@@ -500,6 +478,14 @@ export function SimulationTab({
       }
 
       setBacktestProgress(85);
+
+      rawData = rawData.filter(d => d.date >= simStartDate && d.date <= simEndDate);
+      if (rawData.length === 0) {
+        setIsBacktesting(false);
+        setBacktestProgress(0);
+        alert("Tidak ada data dalam rentang tanggal yang dipilih.");
+        return;
+      }
       
       const cap = parseInt(algoCapital.replace(/[^0-9]/g, "")) || 100000000;
       const reservePct = reserveBufferPct;
@@ -518,9 +504,14 @@ export function SimulationTab({
       const chartData: any[] = [];
       const logs: any[] = [];
       
+      const cleanIdx80 = IDX80_TICKERS.map(t => t.replace('.JK', ''));
+      const cleanIdx30 = IDX30_TICKERS.map(t => t.replace('.JK', ''));
+
       const getTopTickersOnDay = (dayPrices: Record<string, number>, dayRanks: Record<string, number>, count: number = 3) => {
         return Object.entries(dayRanks)
           .filter(([ticker]) => {
+            if (simUniverse === "idx80" && !cleanIdx80.includes(ticker)) return false;
+            if (simUniverse === "idx30" && !cleanIdx30.includes(ticker)) return false;
             const price = dayPrices[ticker];
             return price !== undefined && price > 0;
           })
@@ -579,7 +570,8 @@ export function SimulationTab({
         let sharesToBuy = maxLots * 100;
         
         // Capping to prevent Execution Bias (Assumes we can't buy more than 5% of trading volume without driving price radically)
-        const dailyVol = day0.stockVolumes && day0.stockVolumes[ticker] ? day0.stockVolumes[ticker] : 10000000;
+        const day0Any = day0 as any;
+        const dailyVol = day0Any.stockVolumes && day0Any.stockVolumes[ticker] ? day0Any.stockVolumes[ticker] : 10000000;
         const maxVolShares = Math.floor((dailyVol * 0.05) / 100) * 100;
         if (sharesToBuy > maxVolShares) {
           sharesToBuy = maxVolShares;
@@ -821,7 +813,7 @@ export function SimulationTab({
               let maxLots = Math.floor(allocPrice / (costWithFee * 100));
               let sharesToBuy = maxLots * 100;
 
-              const dailyVol = day.stockVolumes && day.stockVolumes[ticker] ? day.stockVolumes[ticker] : 10000000;
+              const dailyVol = (day as any).stockVolumes && (day as any).stockVolumes[ticker] ? (day as any).stockVolumes[ticker] : 10000000;
               const maxVolShares = Math.floor((dailyVol * 0.05) / 100) * 100;
               if (sharesToBuy > maxVolShares) {
                 sharesToBuy = maxVolShares;
@@ -881,7 +873,7 @@ export function SimulationTab({
               let newLots = Math.floor(sellProceeds / (swapInCostWithFee * 100));
               let newShares = newLots * 100;
 
-              const dailyVol = day.stockVolumes && day.stockVolumes[swapInTicker] ? day.stockVolumes[swapInTicker] : 10000000;
+              const dailyVol = (day as any).stockVolumes && (day as any).stockVolumes[swapInTicker] ? (day as any).stockVolumes[swapInTicker] : 10000000;
               const maxVolShares = Math.floor((dailyVol * 0.05) / 100) * 100;
               if (newShares > maxVolShares) {
                 newShares = maxVolShares;
@@ -1000,8 +992,9 @@ export function SimulationTab({
 
       setIsBacktesting(false);
       setBacktestProgress(100);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Backtest failed:", err);
+      alert(err.message || "Backtest gagal. Periksa tanggal mulai.");
       setIsBacktesting(false);
     }
   };
@@ -1026,7 +1019,7 @@ export function SimulationTab({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `database_backtest_2020_2026_${backtestConfigType.toUpperCase()}.csv`);
+      link.setAttribute("download", `database_backtest_${simStartDate}_${simEndDate}_${backtestConfigType.toUpperCase()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1071,7 +1064,7 @@ export function SimulationTab({
              Interactive Trading & Backtest Laboratory
           </h2>
           <p className="text-[10px] text-zinc-500 mt-2 max-w-2xl leading-relaxed">
-            Bandingkan performa investasi harian sejak 2020 dengan algoritma rebalancing saham & perlindungan crash IHSG otomatis.
+            Bandingkan performa investasi harian sejak {simStartDate} dengan algoritma rebalancing saham & perlindungan crash IHSG otomatis.
           </p>
         </div>
         
@@ -1141,20 +1134,35 @@ export function SimulationTab({
             </div>
 
             {/* 2. Timeline selector */}
-            <div>
-              <label className="text-[10px] uppercase font-bold text-white/40 block mb-2 font-mono">2. Jangka Waktu Investasi</label>
-              <div className="relative">
-                <select
-                  value={simTimeline}
-                  onChange={(e) => setSimTimeline(e.target.value)}
-                  className="w-full text-xs p-3 bg-black border border-white/10 focus:border-amber-500 outline-none text-white font-bold rounded-xl font-mono cursor-pointer"
-                >
-                  {TIMELINES.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.label} ({t.desc})
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-4">
+              <label className="text-[10px] uppercase font-bold text-white/40 block font-mono">2. Rentang Tanggal Simulasi</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-white/30 block mb-1 font-mono">Mulai Dari</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={simStartDate}
+                      min="2016-01-04"
+                      max={simEndDate}
+                      onChange={(e) => setSimStartDate(e.target.value)}
+                      className="w-full text-xs p-3 bg-black border border-white/10 focus:border-amber-500 outline-none text-white font-bold rounded-xl font-mono cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-white/30 block mb-1 font-mono">Sampai Dengan</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={simEndDate}
+                      min={simStartDate}
+                      max="2026-06-12"
+                      onChange={(e) => setSimEndDate(e.target.value)}
+                      className="w-full text-xs p-3 bg-black border border-white/10 focus:border-amber-500 outline-none text-white font-bold rounded-xl font-mono cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1200,7 +1208,7 @@ export function SimulationTab({
             <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl space-y-1">
               <span className="text-[9px] uppercase font-bold tracking-widest text-white/30 block">Harga Jual Masa Lalu</span>
               <span className="text-sm font-bold font-mono text-white block">{formatRupiah(startPrice)}</span>
-              <span className="text-[9px] text-[#A0A0A0] block">Per lembar pada {timelineObj.label}</span>
+              <span className="text-[9px] text-[#A0A0A0] block">Per lembar pada {simStartDate}</span>
             </div>
 
             <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl space-y-1">
@@ -1248,7 +1256,7 @@ export function SimulationTab({
             </div>
 
             <div className="text-[11px] text-white/50 leading-relaxed font-sans max-w-md sm:text-right">
-              Pembelian modal awal <span className="text-white font-semibold">{formatRupiah(simCapital)}</span> pada emiten <span className="text-emerald-400 font-bold">#{simTicker}</span> {timelineObj.label} hari ini bernilai <span className="text-white font-semibold">{formatRupiah(simReturnDetails.finalValue)}</span>.
+              Pembelian modal awal <span className="text-white font-semibold">{formatRupiah(simCapital)}</span> pada emiten <span className="text-emerald-400 font-bold">#{simTicker}</span> dari <span className="text-white">{simStartDate}</span> bernilai <span className="text-white font-semibold">{formatRupiah(simReturnDetails.finalValue)}</span> pada <span className="text-white">{simEndDate}</span>.
             </div>
           </div>
 
@@ -1299,7 +1307,7 @@ export function SimulationTab({
             <div className="flex items-center gap-2.5">
               <Award className="w-5 h-5 text-emerald-400" />
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Advanced Real-time Algorithmic Backtester (2020 - 2026)</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Advanced Real-time Algorithmic Backtester ({simStartDate} hingga {simEndDate})</h3>
                 <p className="text-[11px] text-white/35 mt-0.5">Simulasikan rotasi harian dengan perlindungan crash IHSG & rebalance otomatis.</p>
               </div>
             </div>
@@ -1309,10 +1317,10 @@ export function SimulationTab({
           </div>
 
           {/* Config row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             {/* Control Column */}
-            <div className="space-y-5 lg:col-span-1 bg-[#050505] p-5 border border-white/5 rounded-xl">
+            <div className="space-y-5 md:col-span-1 bg-[#050505] p-5 border border-white/5 rounded-xl">
               <h4 className="text-xs uppercase font-extrabold tracking-wider text-white flex items-center gap-1.5 pb-2 border-b border-white/5">
                 ⚙️ Parameter Backtest
               </h4>
@@ -1367,6 +1375,43 @@ export function SimulationTab({
                     <span className="text-[9px] text-[#A0A0A0]/80 block leading-tight">
                       Beli {numStocks} saham terbaik berdasarkan skor faktor setiap hari.
                     </span>
+                  </div>
+
+                  {/* Universe Saham */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-white/40 uppercase block font-mono">Universe Seleksi Saham</span>
+                    <div className="flex gap-2 text-[10px]">
+                      <button
+                        onClick={() => setSimUniverse("all")}
+                        className={`flex-1 font-bold py-2 rounded-lg cursor-pointer border transition-all ${
+                          simUniverse === "all"
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                            : "bg-[#0A0A0A] border-white/5 text-white/40 hover:text-white/60"
+                        }`}
+                      >
+                        Semua Saham
+                      </button>
+                      <button
+                        onClick={() => setSimUniverse("idx80")}
+                        className={`flex-1 font-bold py-2 rounded-lg cursor-pointer border transition-all ${
+                          simUniverse === "idx80"
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                            : "bg-[#0A0A0A] border-white/5 text-white/40 hover:text-white/60"
+                        }`}
+                      >
+                        IDX80
+                      </button>
+                      <button
+                        onClick={() => setSimUniverse("idx30")}
+                        className={`flex-1 font-bold py-2 rounded-lg cursor-pointer border transition-all ${
+                          simUniverse === "idx30"
+                            ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                            : "bg-[#0A0A0A] border-white/5 text-white/40 hover:text-white/60"
+                        }`}
+                      >
+                        IDX30
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Strategy Configuration Selector */}
@@ -1439,6 +1484,39 @@ export function SimulationTab({
                   
                 </>
               )}
+
+              {/* Date Pickers */}
+              <div className="space-y-4 pt-4 border-t border-white/5 mt-4">
+                <span className="text-[10px] text-white/40 uppercase block font-mono">Rentang Waktu Backtest</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] uppercase font-bold text-white/30 block mb-1 font-mono">Mulai Dari</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={simStartDate}
+                        min="2016-01-04"
+                        max={simEndDate}
+                        onChange={(e) => setSimStartDate(e.target.value)}
+                        className="w-full text-xs p-2.5 bg-black border border-white/10 focus:border-emerald-500 outline-none text-white font-bold rounded-lg font-mono cursor-pointer block"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase font-bold text-white/30 block mb-1 font-mono">Sampai Dengan</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={simEndDate}
+                        min={simStartDate}
+                        max="2026-06-12"
+                        onChange={(e) => setSimEndDate(e.target.value)}
+                        className="w-full text-xs p-2.5 bg-black border border-white/10 focus:border-emerald-500 outline-none text-white font-bold rounded-lg font-mono cursor-pointer block"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Capital input */}
               <div className="space-y-1">
@@ -1573,13 +1651,13 @@ export function SimulationTab({
                 Unduh Data Historis (.CSV)
               </button>
               <p className="text-[10px] text-white/30 text-center leading-normal">
-                Gunakan tombol unduh di atas untuk menyimpan seluruh data mentah harian (Jan 2020 - Jun 2026) dalam format file <b>CSV / Excel</b>.
+                Gunakan tombol unduh di atas untuk menyimpan seluruh data mentah harian ({simStartDate} hingga {simEndDate}) dalam format file <b>CSV / Excel</b>.
               </p>
 
             </div>
 
             {/* Results Column */}
-            <div className="lg:col-span-2 space-y-5">
+            <div className="md:col-span-2 space-y-5">
               
               {isBacktesting ? (
                 <div className="bg-[#050505] border border-white/5 rounded-xl flex flex-col items-center justify-center py-24 space-y-4 shadow-inner">
@@ -1589,7 +1667,7 @@ export function SimulationTab({
                   </div>
                   <div className="text-center space-y-1">
                     <p className="text-xs font-mono text-white tracking-widest uppercase animate-pulse">Running Quant Simulations...</p>
-                    <p className="text-[10px] text-white/30 font-mono">Iterating 1.560 ticks day-by-day (2020 - 2026)</p>
+                    <p className="text-[10px] text-white/30 font-mono">Iterating ticks day-by-day ({simStartDate} hingga {simEndDate})</p>
                   </div>
                   
                   {/* Progress bar */}
@@ -1694,9 +1772,9 @@ export function SimulationTab({
                       <span className="text-lg">📈</span>
                       <div className="text-xs text-white/60">
                         {simulationMode === "algo" ? (
-                          <>Algoritma rotasi harian dengan penyisihan saham Rank &ge;7 berbasis <strong className="text-emerald-400">{backtestResult.configName}</strong> berhasil melampaui tolok ukur pasar IHSG! Dengan modal awal <span className="text-white font-bold">{formatRupiah(parseInt(algoCapital.replace(/[^0-9]/g, "")) || 100000000)}</span> sejak awal 2020 hingga Juni 2026, rebalancing portofolio otomatis Anda melonjak menjadi <span className="text-emerald-400 font-extrabold">{formatRupiah(backtestResult.finalValue)}</span> dibandingkan acuan pasar IHSG <span className="text-yellow-400 font-bold">{formatRupiah(backtestResult.ihsgFinalValue)}</span>.</>
+                          <>Algoritma rotasi harian dengan penyisihan saham Rank &ge;7 berbasis <strong className="text-emerald-400">{backtestResult.configName}</strong> berhasil melampaui tolok ukur pasar IHSG! Dengan modal awal <span className="text-white font-bold">{formatRupiah(parseInt(algoCapital.replace(/[^0-9]/g, "")) || 100000000)}</span> sejak {simStartDate} hingga {simEndDate}, rebalancing portofolio otomatis Anda melonjak menjadi <span className="text-emerald-400 font-extrabold">{formatRupiah(backtestResult.finalValue)}</span> dibandingkan acuan pasar IHSG <span className="text-yellow-400 font-bold">{formatRupiah(backtestResult.ihsgFinalValue)}</span>.</>
                         ) : (
-                          <>Simulasi Hold & Protect pada saham tunggal <strong className="text-emerald-400">#{simTicker}</strong> dengan proteksi risiko krisis. Dengan modal awal <span className="text-white font-bold">{formatRupiah(parseInt(algoCapital.replace(/[^0-9]/g, "")) || 100000000)}</span> sejak awal 2020 hingga Juni 2026, nilai investasi Anda berubah menjadi <span className="text-emerald-400 font-extrabold">{formatRupiah(backtestResult.finalValue)}</span>.</>
+                          <>Simulasi Hold & Protect pada saham tunggal <strong className="text-emerald-400">#{simTicker}</strong> dengan proteksi risiko krisis. Dengan modal awal <span className="text-white font-bold">{formatRupiah(parseInt(algoCapital.replace(/[^0-9]/g, "")) || 100000000)}</span> sejak {simStartDate} hingga {simEndDate}, nilai investasi Anda berubah menjadi <span className="text-emerald-400 font-extrabold">{formatRupiah(backtestResult.finalValue)}</span>.</>
                         )}
                       </div>
                     </div>
@@ -1755,7 +1833,7 @@ export function SimulationTab({
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <span className="text-[10px] uppercase font-bold tracking-widest text-[#E0E0E0]/50 block flex items-center gap-1.5">
-                            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Peringkat Rotasi Historis Saham (2020 - 2026)
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Peringkat Rotasi Historis Saham ({simStartDate} hingga {simEndDate})
                           </span>
                           <p className="text-[11px] text-white/40 leading-relaxed mt-1">
                             Fluktuasi peringkat harian emiten berdasarkan bobot faktor kuantitatif untuk strategi aktif: <span className="text-emerald-400 font-bold">{backtestResult.configName}</span>. Peringkat yang lebih rendah (Rank 1) mewakili emiten terkuat untuk dikoleksi.

@@ -267,8 +267,8 @@ export function MarketTab({
       >
         <div className={`absolute top-0 right-0 w-48 h-48 ${isIHSGInCrisis ? "bg-rose-500/5 animate-pulse" : "bg-white/[0.02]"} rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none`} />
         
-        <div className="flex flex-col lg:flex-row justify-between items-start gap-6 pb-6 border-b border-white/[0.05] w-full">
-          <div className="flex flex-col sm:flex-row gap-6 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row flex-wrap justify-between items-start gap-6 pb-6 border-b border-white/[0.05] w-full">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-6 w-full xl:w-auto">
             {/* System Status (Status Pasar) */}
             <div>
               <span className="text-[10px] uppercase font-bold tracking-widest text-[#E0E0E0]/30 block mb-2 font-mono">STATUS PASAR (SISTEM)</span>
@@ -312,7 +312,7 @@ export function MarketTab({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
+          <div className="flex flex-row flex-wrap gap-3 w-full xl:w-auto shrink-0 mt-4 xl:mt-0">
             <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl flex-1 lg:w-44">
               <span className="text-[9px] uppercase font-bold tracking-widest text-white/30 block mb-1">Tindakan</span>
               <span className={`inline-block text-[11px] font-bold tracking-wider px-2 py-0.5 rounded-md border ${currentAction === "WAIT" ? "bg-white/[0.05] text-white/80 border-white/5" : actionClass}`}>
@@ -522,10 +522,10 @@ export function MarketTab({
       </div>
 
       {/* 3. DUAL-COLUMN WORKSPACE: LEFT (Order book, timeline) | RIGHT (AI chat agent) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
         
         {/* LEFT COLUMN: REAL-TIME MARKET COND (8 CoL) */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="md:col-span-1 lg:col-span-8 space-y-6">
           
           {/* A. ACTIVE ORDER BOOK (With live ticker switcher dropdown) */}
           <div className="bg-[#050505] border border-white/[0.03] rounded-2xl p-6 relative overflow-hidden">
@@ -651,7 +651,7 @@ export function MarketTab({
         </div>
 
         {/* RIGHT COLUMN: CHAT WITH AI AGENT (4 CoL) */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="md:col-span-1 lg:col-span-4 space-y-6 flex flex-col">
           
           {/* A. CHAT WITH AI AGENT INTEGRATION SPACE */}
           <div className="bg-[#050505] border border-white/[0.03] rounded-2xl p-1 pb-4 relative overflow-hidden flex flex-col h-full">

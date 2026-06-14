@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getStock, STOCKS_DATA } from "./stocksData";
 import { idxNews, EX, MKT, RS } from "./marketData";
 import { StockData, AnalysisResult, PortfolioItem, WatchlistItem } from "./types";
@@ -56,7 +56,8 @@ import {
   Briefcase,
   Bookmark,
   BookmarkCheck,
-  Monitor
+  Monitor,
+  Hexagon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -79,8 +80,8 @@ export default function App() {
   const [isGoapiConnected, setIsGoapiConnected] = useState(false);
   const [isYahooConnected, setIsYahooConnected] = useState(false);
 
-
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Dynamic pricing fluctuation state to support rolling real-time updates
   const [priceFluctuations, setPriceFluctuations] = useState<Record<string, number>>({});
@@ -330,7 +331,17 @@ export default function App() {
     syncProfileToFirebase();
   }, [theme, dataFeed, activeConfig, cash]);
 
-
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Handle opening stock detail drawer
   const handleSelectTicker = (ticker: string) => {
@@ -734,26 +745,20 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-white/5 px-3 py-2 md:px-6 md:py-2.5 shrink-0 flex flex-col md:flex-row items-center justify-between gap-2.5 md:gap-4">
         {/* Brand Logo & Name */}
         <div className="flex items-center justify-start w-full md:w-auto gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shadow-lg shrink-0">
-            <svg 
-              className="w-4 h-4 text-white" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              {/* Candlestick 1 (Bearish solid) */}
-              <path d="M6 3v18" />
-              <rect x="4" y="7" width="4" height="10" rx="0.5" fill="currentColor" className="fill-white" />
-              {/* Candlestick 2 (Bullish hollow) */}
-              <path d="M12 1v22" />
-              <rect x="10" y="5" width="4" height="12" rx="0.5" fill="none" className="stroke-white" />
-              {/* Candlestick 3 (Bullish solid) */}
-              <path d="M18 5v14" />
-              <rect x="16" y="9" width="4" height="6" rx="0.5" fill="currentColor" className="fill-white" />
+          <div className="flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 115 100" className="w-8 h-8 text-white transition-colors duration-300 dark:text-white" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="48" cy="45" r="28" stroke="currentColor" strokeWidth="16" />
+              <path d="M 61 58 L 81 78" stroke="currentColor" strokeWidth="16" strokeLinecap="square" />
+              <circle cx="98" cy="70" r="10" className="fill-emerald-400" />
             </svg>
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-[13px] md:text-sm font-black text-white tracking-widest uppercase">
+              Quantbit
+            </h1>
+            <span className="text-[8px] md:text-[9px] text-white/40 uppercase tracking-[0.2em] font-medium leading-none mt-0.5">
+              Terminal
+            </span>
           </div>
         </div>
 
@@ -886,151 +891,127 @@ export default function App() {
             <span className="text-[10px] text-white/70 font-medium truncate max-w-[120px]">{user?.email}</span>
           </div>
 
-          {/* Settings Menu Toggle */}
-          <button 
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className="w-8 h-8 rounded-xl border border-white/5 hover:bg-white/10 flex items-center justify-center transition-all bg-[#0A0A0A] z-50 relative"
-          >
-            {isSettingsOpen ? <X className="w-4 h-4 text-white" /> : <Settings className="w-4 h-4 text-white/70" />}
-          </button>
+          <div className="relative" ref={settingsDropdownRef}>
+            {/* Settings Menu Toggle */}
+            <button 
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              className="w-8 h-8 rounded-xl border border-white/5 hover:bg-white/10 flex items-center justify-center transition-all bg-[#0A0A0A] z-50 relative"
+            >
+              <Settings className="w-4 h-4 text-white/70" />
+            </button>
 
-          {/* Mobile Menu Toggle */}
+            {/* Settings Dropdown */}
+            <AnimatePresence>
+              {isSettingsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-12 right-0 w-64 bg-[#121212] border border-white/[0.05] shadow-2xl rounded-2xl py-2 z-[60] flex flex-col font-sans"
+                >
+                  <div className="px-4 py-2 border-b border-white/[0.05] mb-1">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400">
+                        <span className="text-xs font-bold uppercase">{user.email?.charAt(0) || "U"}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-white font-medium truncate max-w-[150px]">{user.email}</span>
+                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Signed in</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-2 py-1">
+                    <div className="text-[10px] font-bold text-zinc-500 px-3 pt-2 pb-1 uppercase tracking-widest">Tema Aplikasi</div>
+                    <button onClick={() => setTheme("dark")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      <Moon className="w-4 h-4" /> Gelap
+                      {theme === "dark" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                    <button onClick={() => setTheme("light")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      <Sun className="w-4 h-4" /> Terang
+                      {theme === "light" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                    <button onClick={() => setTheme("stockbit")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      <Monitor className="w-4 h-4" /> Stockbit
+                      {theme === "stockbit" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                  </div>
+
+                  <div className="h-px w-full bg-white/[0.05] my-1" />
+
+                  <div className="px-2 py-1">
+                    <div className="text-[10px] font-bold text-zinc-500 px-3 pt-2 pb-1 uppercase tracking-widest">Data Feed</div>
+                    <button onClick={() => setDataFeed("yahoo")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      Yahoo Finance
+                      {dataFeed === "yahoo" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                    <button onClick={() => setDataFeed("goapi")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      GoAPI.io
+                      {dataFeed === "goapi" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                    <button onClick={() => setDataFeed("simulated")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      Simulasi Offline
+                      {dataFeed === "simulated" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                  </div>
+
+                  <div className="h-px w-full bg-white/[0.05] my-1" />
+
+                  <div className="px-2 py-1">
+                    <div className="text-[10px] font-bold text-zinc-500 px-3 pt-2 pb-1 uppercase tracking-widest">Konfigurasi</div>
+                    <button onClick={() => setActiveConfig("prod")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      <Sliders className="w-4 h-4" /> Config F
+                      {activeConfig === "prod" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                    <button onClick={() => setActiveConfig("res")} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors">
+                      <Sliders className="w-4 h-4" /> Config B
+                      {activeConfig === "res" && <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    </button>
+                  </div>
+
+                  <div className="h-px w-full bg-white/[0.05] my-1" />
+
+                  <div className="px-2 py-1">
+                    <button onClick={() => { setIsSettingsOpen(false); signOut(auth); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors">
+                      <LogOut className="w-4 h-4" /> Keluar Akun
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Unified Mobile Menu Toggle */}
           <button 
-            className="lg:hidden w-8 h-8 rounded-xl border border-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors"
+            className="md:hidden w-8 h-8 rounded-xl border border-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
 
-          {/* Settings Dropdown */}
-          <AnimatePresence>
-            {isSettingsOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className="absolute top-12 right-0 w-64 bg-[#050505] border border-white/[0.05] shadow-2xl rounded-2xl p-5 z-50 flex flex-col gap-5"
-              >
-                {/* User Info (Mobile mostly) */}
-                <div className="md:hidden flex items-center bg-white/[0.02] border border-white/[0.03] rounded-xl p-3 gap-3 mb-1">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                    <span className="text-xs text-emerald-400 font-bold uppercase">{user.email?.charAt(0) || "U"}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest">Akun</span>
-                    <span className="text-xs text-white/90 font-mono mt-0.5 truncate max-w-[150px]">{user.email}</span>
-                  </div>
-                </div>
-
-                {/* Configuration Toggle */}
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-zinc-500 block tracking-widest mb-3">Model Konfigurasi</span>
-                  <div className="flex items-center bg-white/[0.01] border border-white/[0.03] rounded-xl p-1">
-                    <button
-                      onClick={() => setActiveConfig("prod")}
-                      className={`flex-1 py-2 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        activeConfig === "prod" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      Config F
-                    </button>
-                    <button
-                      onClick={() => setActiveConfig("res")}
-                      className={`flex-1 py-2 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        activeConfig === "res" ? "bg-blue-600/20 text-blue-400 shadow-sm" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      Config B
-                    </button>
-                  </div>
-                </div>
-
-                {/* Theme Toggle */}
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-zinc-500 block tracking-widest mb-3">Tema Aplikasi</span>
-                  <div className="flex bg-white/[0.01] border border-white/[0.03] rounded-xl p-1 gap-1">
-                    <button
-                      onClick={() => setTheme("dark")}
-                      className={`flex-1 flex gap-1.5 items-center justify-center py-2 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        theme === "dark" ? "bg-amber-500/10 text-amber-500 shadow-sm" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      <Moon className="w-3 h-3" /> Gelap
-                    </button>
-                    <button
-                      onClick={() => setTheme("light")}
-                      className={`flex-1 flex gap-1.5 items-center justify-center py-2 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        theme === "light" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      <Sun className="w-3 h-3" /> Terang
-                    </button>
-                    <button
-                      onClick={() => setTheme("stockbit")}
-                      className={`flex-1 flex gap-1.5 items-center justify-center py-2 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        theme === "stockbit" ? "bg-[#10b981]/10 text-[#10b981] shadow-sm" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      <Monitor className="w-3 h-3" /> Stockbit
-                    </button>
-                  </div>
-                </div>
-
-                {/* Data Feed Selector */}
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-zinc-500 block tracking-widest mb-3">Live Market Data Feed</span>
-                  <div className="flex flex-col gap-1 bg-white/[0.01] border border-white/[0.03] p-1.5 rounded-xl">
-                    <button
-                      onClick={() => setDataFeed("yahoo")}
-                      className={`py-2 px-3 text-left text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        dataFeed === "yahoo" ? "bg-sky-500/10 text-sky-400" : "text-white/40 hover:bg-white/[0.02] hover:text-white"
-                      }`}
-                    >
-                      Yahoo Finance Feed
-                    </button>
-                    <button
-                      onClick={() => setDataFeed("goapi")}
-                      className={`py-2 px-3 text-left text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        dataFeed === "goapi" ? "bg-emerald-500/10 text-emerald-400" : "text-white/40 hover:bg-white/[0.02] hover:text-white"
-                      }`}
-                    >
-                      GoAPI.io Feed
-                    </button>
-                    <button
-                      onClick={() => setDataFeed("simulated")}
-                      className={`py-2 px-3 text-left text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                        dataFeed === "simulated" ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/[0.02] hover:text-white"
-                      }`}
-                    >
-                      Simulasi Harga (Offline)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Authentication Utilities */}
-                <div className="pt-2">
-                  <button
-                    onClick={() => signOut(auth)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 rounded-xl transition-colors cursor-pointer group"
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-widest">Keluar Akun</span>
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
         </div>
 
       </header>
 
-      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden lg:min-h-0 relative">
+      <div className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden md:min-h-0 relative">
         
+        {/* Mobile Sidebar Backdrop */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
         {/* LEFT BAR NAV & QUICK ACCESS */}
-        <aside id="main-sidebar" className={`${isMobileMenuOpen ? 'flex absolute inset-0 z-50 bg-[#0A0A0A]' : 'hidden'} lg:flex w-full lg:static lg:w-80 bg-[#0A0A0A] lg:border-r border-white/10 shrink-0 flex-col lg:overflow-hidden`}>
-          <div className="flex flex-col flex-1 overflow-y-auto lg:overflow-y-auto py-4 gap-4 scrollbar-thin">
+        <aside id="main-sidebar" className={`${isMobileMenuOpen ? 'flex fixed inset-y-0 left-0 w-[85%] max-w-sm z-50 bg-[#0A0A0A] shadow-2xl' : 'hidden'} md:flex w-full md:static md:w-72 lg:w-80 bg-[#0A0A0A] md:border-r border-white/10 shrink-0 flex-col md:overflow-hidden transition-all duration-300`}>
+          <div className="flex flex-col flex-1 overflow-y-auto md:overflow-y-auto py-4 gap-4 scrollbar-thin">
             
             {/* DIGITAL WALLET RDI - OVERHAULED */}
             <div id="rdi-digital-wallet-container" className="mx-4 overflow-hidden rounded-2xl border border-white/5 shadow-2xl">
@@ -1153,51 +1134,10 @@ export default function App() {
               </div>
             </div>
           </div>
-
-          {/* Quick Listings Directory in Sidebar Footer for fast lookups */}
-          <div className="p-4 border-t border-white/[0.05] shrink-0 flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest block mb-4 px-1">Ticker Directory</span>
-            <div className="relative mb-3 shrink-0">
-              <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search quick tickers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs pl-8 pr-3 py-2 bg-white/[0.02] border border-white/[0.03] rounded-xl outline-none focus:border-white/20 text-white font-mono"
-              />
-            </div>
-            <div className="overflow-y-auto space-y-1.5 pr-2 flex-1 scrollbar-thin max-h-[160px] lg:max-h-[220px]">
-              {filteredStocks.map(s => {
-                const isSaved = watchlist.some(w => w.ticker === s.ticker);
-                return (
-                  <div
-                    key={s.ticker}
-                    onClick={() => handleSelectTicker(s.ticker)}
-                    className="flex justify-between items-center text-xs p-2.5 bg-white/[0.01] hover:bg-white/[0.05] border border-white/[0.02] rounded-xl cursor-pointer transition-all font-mono"
-                  >
-                    <span className="font-bold text-white tracking-widest">{s.ticker}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white/50">Rp{s.currentPrice}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleWatchlist(s.ticker);
-                        }}
-                        className={`transition-colors cursor-pointer ${isSaved ? "text-amber-400" : "text-white/20 hover:text-white"}`}
-                      >
-                        <Eye className="w-4 h-4 fill-current" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </aside>
 
         {/* WORKSPACE AREA */}
-        <main id="main-workspace" className="flex-1 p-6 sm:p-8 lg:p-10 overflow-visible lg:overflow-y-auto pb-24 lg:pb-10 flex flex-col">
+        <main id="main-workspace" className="flex-1 p-6 sm:p-8 lg:p-10 overflow-visible md:overflow-y-auto pb-24 md:pb-10 flex flex-col">
           
           <div className="max-w-5xl mx-auto space-y-8 flex-1 flex flex-col w-full h-full">
             
@@ -1696,7 +1636,7 @@ export default function App() {
 
               {/* Collapsed Drawer footer */}
               <div className="p-4 bg-black border-t border-white/5 text-[10px] text-white/30 text-center shrink-0">
-                Click elsewhere to dismiss • Indonesia Stock Intelligence V7
+                Click elsewhere to dismiss • Quantbit
               </div>
             </motion.div>
           </div>
@@ -1707,7 +1647,7 @@ export default function App() {
       <footer id="credits-footer" className="py-8 bg-[#070707] border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 lg:px-8 text-center space-y-2">
           <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
-            Indonesia Stock Intelligence • Terminal Version V7
+            Quantbit • Terminal Version
           </p>
           <p className="text-[10px] text-white/35 max-w-xl mx-auto leading-relaxed">
             Legal Disclaimer: Any simulated trading portfolios, historical backtests, or factor scoring calculations provided within this workspace do not represent formal investment pathways in Bursa Efek Indonesia. Always review with licensed securities advisors before trading real investment funds.
